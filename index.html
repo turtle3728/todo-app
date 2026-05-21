@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <title>할 일 달력</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#667eea">
@@ -86,8 +86,11 @@
     .cal-cell {
       min-height: 80px; padding: 5px; border-radius: 10px;
       border: 1.5px solid transparent; cursor: pointer; transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
     }
-    .cal-cell:hover:not(.other) { background: var(--primary-bg); border-color: var(--primary); }
+    @media (hover: hover) {
+      .cal-cell:hover:not(.other) { background: var(--primary-bg); border-color: var(--primary); }
+    }
     .cal-cell.other { opacity: 0.22; pointer-events: none; }
     .cal-cell.selected { background: var(--primary-bg); border-color: var(--primary); }
     .cal-cell.sun .dn { color: #fc8181; } .cal-cell.sat .dn { color: #90cdf4; }
@@ -663,16 +666,21 @@
 
       if(emojiPickerOpen) renderEmojiGrid();
 
+      const isDesktop = matchMedia('(hover:hover) and (pointer:fine)').matches;
       if(editingId) {
         const t=todos.find(x=>x.id===editingId);
         if(t) initEditForm(t);
         const ei=document.getElementById('edit-text');
-        if(ei){ ei.focus(); ei.select();
+        if(ei){
           ei.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.isComposing) saveEdit(editingId,sel); if(e.key==='Escape') cancelEdit(); });
+          if(isDesktop){ ei.focus(); ei.select(); }
         }
       } else {
         const inp=document.getElementById('pInput');
-        if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.isComposing) addTodo(); }); }
+        if(inp){
+          inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.isComposing) addTodo(); });
+          if(isDesktop) inp.focus();
+        }
       }
     }
 
