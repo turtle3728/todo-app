@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>할 일 달력</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#667eea">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="할일달력">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -923,6 +930,11 @@
     function jumpToDate(key) {
       const [y,m]=key.split('-').map(Number); curYear=y; curMonth=m-1; sel=key;
       emojiPickerOpen=false; editingId=null; refresh(); window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    // ── Service Worker ────────────────────────────────
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
     }
 
     // ── Init ──────────────────────────────────────────
