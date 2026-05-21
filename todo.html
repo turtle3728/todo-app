@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>할 일 달력</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #667eea; --primary-2: #764ba2;
+      --primary-bg: rgba(102,126,234,0.1);
+      --text: #2d3748; --muted: #a0aec0; --border: #e2e8f0;
+      --danger: #ef5350; --danger-bg: #fdecea;
+    }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; padding: 32px 16px 60px;
+    }
+    h1.app-title {
+      text-align: center; color: #fff; font-size: 1.6rem;
+      font-weight: 700; margin-bottom: 24px; letter-spacing: -0.5px;
+    }
+    .layout {
+      max-width: 1040px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 334px;
+      gap: 20px; align-items: start;
+    }
+    .card { background: #fff; border-radius: 20px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+
+    /* ── Calendar ── */
+    .calendar-card { grid-column: 1; grid-row: 1; }
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .cal-nav-center { position: relative; display: flex; align-items: center; gap: 2px; }
+    .year-label, .month-label {
+      font-size: 1.1rem; font-weight: 700; color: var(--text);
+      cursor: pointer; padding: 3px 7px; border-radius: 7px;
+      transition: all 0.15s; user-select: none;
+    }
+    .year-label:hover, .month-label:hover { background: var(--primary-bg); color: var(--primary); }
+    .year-inp {
+      width: 74px; padding: 2px 6px; border: none; border-bottom: 2px solid var(--primary);
+      background: transparent; font-size: 1.1rem; font-weight: 700; color: var(--primary);
+      text-align: center; outline: none; font-family: inherit;
+    }
+    .year-inp::-webkit-inner-spin-button, .year-inp::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .month-picker {
+      position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: white; border-radius: 14px; padding: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+      z-index: 100; width: 220px; border: 1.5px solid var(--border);
+      animation: fadeUp 0.15s ease;
+    }
+    .month-opt {
+      padding: 8px 4px; text-align: center; border: none;
+      border-radius: 8px; font-size: 0.82rem; font-family: inherit;
+      color: var(--muted); cursor: pointer; font-weight: 500; transition: all 0.15s; background: none;
+    }
+    .month-opt:hover { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+    .month-opt.cur-month { background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+    .month-opt.today-m { border: 1.5px solid rgba(102,126,234,0.4); }
+    .today-btn {
+      padding: 4px 11px; border: 1.5px solid var(--border); border-radius: 99px;
+      background: #fff; font-size: 0.76rem; font-family: inherit;
+      color: var(--muted); cursor: pointer; font-weight: 600; transition: all 0.2s; margin-left: 4px;
+    }
+    .today-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .nav-btn {
+      width: 34px; height: 34px; border: none; border-radius: 9px;
+      background: var(--primary-bg); color: var(--primary); font-size: 1.2rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .nav-btn:hover { background: var(--primary); color: #fff; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .day-name { text-align: center; font-size: 0.72rem; font-weight: 600; color: var(--muted); padding: 6px 0 10px; }
+    .day-name.sun { color: #fc8181; } .day-name.sat { color: #90cdf4; }
+    .cal-cell {
+      min-height: 80px; padding: 5px; border-radius: 10px;
+      border: 1.5px solid transparent; cursor: pointer; transition: all 0.15s;
+    }
+    .cal-cell:hover:not(.other) { background: var(--primary-bg); border-color: var(--primary); }
+    .cal-cell.other { opacity: 0.22; pointer-events: none; }
+    .cal-cell.selected { background: var(--primary-bg); border-color: var(--primary); }
+    .cal-cell.sun .dn { color: #fc8181; } .cal-cell.sat .dn { color: #90cdf4; }
+    .cal-cell.is-today .dn { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff; }
+    .cell-head { display: flex; align-items: center; gap: 2px; margin-bottom: 3px; flex-wrap: wrap; }
+    .dn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; border-radius: 50%;
+      font-size: 0.8rem; font-weight: 600; color: var(--text); flex-shrink: 0;
+    }
+    .cell-emoji { font-size: 12px; line-height: 1; }
+    .cell-emoji-more { font-size: 0.58rem; color: var(--muted); }
+    .chips { display: flex; flex-direction: column; gap: 2px; }
+    .chip {
+      font-size: 0.66rem; line-height: 1.5; padding: 1px 5px; border-radius: 4px;
+      background: var(--primary-bg); color: var(--primary-2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chip.done { background: #f0fff4; color: #48bb78; text-decoration: line-through; }
+    .more-label { font-size: 0.63rem; color: var(--muted); padding-left: 2px; }
+
+    /* ── Side Panel ── */
+    .panel-card { grid-column: 2; grid-row: 1; }
+    .panel-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center; color: var(--muted);
+      font-size: 0.88rem; line-height: 1.7; gap: 10px; padding: 60px 0;
+    }
+    .ph-circle {
+      width: 52px; height: 52px; border-radius: 50%; background: var(--primary-bg);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--primary); font-size: 1.3rem; font-weight: 700; margin-bottom: 4px;
+    }
+    .panel-date-label { margin-bottom: 12px; }
+    .panel-date-label .pday {
+      font-size: 1rem; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .today-tag {
+      background: var(--primary-bg); color: var(--primary);
+      font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    }
+
+    /* ── Emoji Section ── */
+    .emoji-section { border: 1.5px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+    .emoji-sec-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; cursor: pointer; background: #fafafa;
+      transition: background 0.15s; user-select: none;
+    }
+    .emoji-sec-head:hover { background: var(--primary-bg); }
+    .emoji-sec-label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+    .emoji-sec-right { display: flex; align-items: center; gap: 6px; }
+    .cur-emoji { font-size: 1rem; line-height: 1; letter-spacing: 1px; }
+    .emoji-arr { font-size: 0.6rem; color: var(--muted); flex-shrink: 0; }
+    .emoji-picker-wrap { padding: 10px; border-top: 1px solid var(--border); }
+
+    /* Selected emoji chips */
+    .sel-emoji-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .sel-emoji-chip {
+      display: inline-flex; align-items: center; gap: 2px;
+      background: var(--primary-bg); border: 1.5px solid var(--primary);
+      border-radius: 6px; padding: 2px 6px; font-size: 1rem;
+      cursor: pointer; transition: all 0.15s; line-height: 1;
+    }
+    .sel-emoji-chip:hover { background: var(--danger-bg); border-color: var(--danger); }
+    .chip-x { font-size: 0.65rem; color: var(--primary); margin-left: 1px; }
+    .sel-emoji-chip:hover .chip-x { color: var(--danger); }
+
+    .emoji-filter-row { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
+    .emoji-filter-row::-webkit-scrollbar { display: none; }
+    .etab {
+      padding: 3px 9px; border: none; border-radius: 6px; background: #f0f0f0;
+      font-size: 0.72rem; font-family: inherit; color: var(--muted);
+      cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0;
+    }
+    .etab.active { background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+    .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 128px; overflow-y: auto; scrollbar-width: thin; }
+    .emo-btn {
+      background: none; border: none; border-radius: 6px; font-size: 1.1rem;
+      cursor: pointer; padding: 3px; line-height: 1; aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center; transition: background 0.12s;
+    }
+    .emo-btn:hover { background: var(--primary-bg); }
+    .emo-btn.sel { background: var(--primary-bg); outline: 2px solid var(--primary); }
+    .clear-emoji-btn {
+      width: 100%; margin-top: 8px; padding: 5px 0; border: none; border-radius: 7px;
+      background: var(--danger-bg); color: var(--danger);
+      font-size: 0.75rem; font-family: inherit; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .clear-emoji-btn:hover { background: var(--danger); color: #fff; }
+
+    /* ── Add Form ── */
+    .add-form { margin-bottom: 14px; display: flex; flex-direction: column; gap: 7px; }
+    .add-row { display: flex; gap: 8px; }
+    .add-row input {
+      flex: 1; padding: 10px 13px; border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: 0.88rem; font-family: inherit;
+      color: var(--text); outline: none; background: #fafafa; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .add-row input::placeholder { color: #c0c0c0; }
+    .add-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-bg); background: #fff; }
+    .add-btn {
+      padding: 10px 14px; background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #fff; border: none; border-radius: 10px; font-size: 0.85rem;
+      font-family: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; transition: opacity 0.2s;
+    }
+    .add-btn:hover { opacity: 0.88; }
+
+    /* Time */
+    .time-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .seg-grp { display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+    .seg-btn {
+      padding: 5px 10px; border: none; background: #fff;
+      font-size: 0.75rem; font-family: inherit; font-weight: 500;
+      color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .seg-btn + .seg-btn { border-left: 1.5px solid var(--border); }
+    .seg-btn.active { background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+    .time-range { display: flex; align-items: center; gap: 5px; }
+    .time-inp {
+      padding: 5px 7px; border: 1.5px solid var(--primary); border-radius: 8px;
+      font-size: 0.75rem; font-family: inherit; color: var(--text);
+      outline: none; background: var(--primary-bg); width: 92px;
+    }
+    .time-sep { font-size: 0.8rem; color: var(--muted); }
+
+    /* Category */
+    .cat-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cat-pill {
+      padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 99px;
+      background: #fff; font-size: 0.73rem; font-family: inherit;
+      color: var(--muted); cursor: pointer; font-weight: 500; white-space: nowrap; transition: all 0.15s;
+    }
+    .cat-pill:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
+    .custom-cat-inp {
+      width: 100%; padding: 6px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 0.78rem; font-family: inherit; color: var(--text);
+      outline: none; background: #fafafa; transition: border-color 0.2s;
+    }
+    .custom-cat-inp:focus { border-color: var(--primary); background: #fff; }
+    .custom-cat-inp::placeholder { color: #c0c0c0; }
+
+    /* People & location */
+    .meta-fields { display: flex; gap: 6px; }
+    .meta-field {
+      flex: 1; min-width: 0; padding: 6px 10px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 0.78rem; font-family: inherit; color: var(--text);
+      outline: none; background: #fafafa; transition: border-color 0.2s;
+    }
+    .meta-field:focus { border-color: var(--primary); background: #fff; }
+    .meta-field::placeholder { color: #c0c0c0; }
+
+    /* ── Todo Items ── */
+    .todo-list { display: flex; flex-direction: column; gap: 7px; }
+    .list-empty { text-align: center; color: var(--muted); font-size: 0.83rem; padding: 28px 0; }
+    .todo-item {
+      display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+      border-radius: 10px; background: #fafafa; border: 1.5px solid var(--border);
+      animation: fadeUp 0.18s ease; transition: opacity 0.2s;
+    }
+    .todo-item.done { opacity: 0.5; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    .item-body { flex: 1; min-width: 0; }
+    .item-head { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; }
+    .item-text { flex: 1; min-width: 0; font-size: 0.88rem; color: var(--text); word-break: break-word; line-height: 1.4; }
+    .todo-item.done .item-text, .all-row.done .item-text { text-decoration: line-through; color: var(--muted); }
+    .cat-tag { font-size: 0.66rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; white-space: nowrap; line-height: 1.6; flex-shrink: 0; }
+    .todo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 4px; }
+    .meta-time { font-size: 0.72rem; font-weight: 700; color: var(--primary); }
+    .meta-info { font-size: 0.72rem; color: var(--muted); }
+    .meta-dot  { font-size: 0.65rem; color: #d0d0d0; }
+
+    /* Item action buttons */
+    .cbw { position: relative; flex-shrink: 0; margin-top: 1px; }
+    .cbw input[type=checkbox] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .cbw label {
+      display: flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border: 2px solid #d0d0d0; border-radius: 6px;
+      cursor: pointer; transition: all 0.2s; background: #fff;
+    }
+    .cbw input:checked + label { background: linear-gradient(135deg, var(--primary), var(--primary-2)); border-color: transparent; }
+    .cbw label::after {
+      content: ''; width: 4px; height: 8px; border: 2px solid #fff;
+      border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px); opacity: 0; transition: opacity 0.15s;
+    }
+    .cbw input:checked + label::after { opacity: 1; }
+
+    .scbw { position: relative; flex-shrink: 0; margin-top: 1px; }
+    .scbw input[type=checkbox] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .scbw label {
+      display: flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border: 2px solid #d0d0d0; border-radius: 5px;
+      cursor: pointer; transition: all 0.2s; background: #fff;
+    }
+    .scbw input:checked + label { background: var(--danger); border-color: transparent; }
+    .scbw label::after {
+      content: ''; width: 3px; height: 7px; border: 2px solid #fff;
+      border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px); opacity: 0; transition: opacity 0.15s;
+    }
+    .scbw input:checked + label::after { opacity: 1; }
+
+    .delbtn, .editbtn {
+      background: none; border: none; font-size: 0.9rem;
+      cursor: pointer; padding: 3px 5px; border-radius: 6px; line-height: 1;
+      transition: all 0.2s; flex-shrink: 0; margin-top: 1px;
+    }
+    .delbtn { color: #ddd; }
+    .delbtn:hover { color: var(--danger); background: var(--danger-bg); }
+    .editbtn { color: #ccc; }
+    .editbtn:hover { color: var(--primary); background: var(--primary-bg); }
+
+    /* ── Edit Form ── */
+    .edit-form {
+      background: var(--primary-bg); border: 1.5px solid var(--primary);
+      border-radius: 12px; padding: 12px;
+      display: flex; flex-direction: column; gap: 7px;
+      animation: fadeUp 0.15s ease;
+    }
+    .edit-text-inp {
+      width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+      border-radius: 9px; font-size: 0.9rem; font-family: inherit; color: var(--text);
+      outline: none; background: #fff; font-weight: 500; transition: border-color 0.2s;
+    }
+    .edit-text-inp:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+    .edit-actions { display: flex; gap: 7px; }
+    .edit-save-btn {
+      flex: 1; padding: 8px; border: none; border-radius: 9px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #fff; font-size: 0.83rem; font-family: inherit; font-weight: 700; cursor: pointer; transition: opacity 0.2s;
+    }
+    .edit-save-btn:hover { opacity: 0.88; }
+    .edit-cancel-btn {
+      padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 9px;
+      background: #fff; color: var(--muted); font-size: 0.83rem; font-family: inherit; cursor: pointer; transition: all 0.15s;
+    }
+    .edit-cancel-btn:hover { border-color: var(--muted); color: var(--text); }
+
+    /* ── All Todos ── */
+    .all-card { grid-column: 1 / -1; grid-row: 2; }
+    .all-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .all-header-left { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .badge { background: var(--primary-bg); color: var(--primary); font-size: 0.72rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; }
+    .sel-toggle-btn {
+      padding: 5px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+      background: #fff; font-size: 0.75rem; font-family: inherit; color: var(--muted); cursor: pointer; font-weight: 600; transition: all 0.2s;
+    }
+    .sel-toggle-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .sel-toggle-btn.on { background: var(--primary-bg); color: var(--primary); border-color: var(--primary); }
+    .sel-del-btn {
+      padding: 5px 12px; border: none; border-radius: 8px;
+      background: var(--danger-bg); color: var(--danger);
+      font-size: 0.75rem; font-family: inherit; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .sel-del-btn:hover:not(:disabled) { background: var(--danger); color: #fff; }
+    .sel-del-btn:disabled { opacity: 0.38; cursor: default; }
+    .all-empty { text-align: center; color: var(--muted); font-size: 0.88rem; padding: 28px 0; }
+    .date-group { margin-bottom: 16px; }
+    .date-group:last-child { margin-bottom: 0; }
+    .group-header {
+      font-size: 0.78rem; font-weight: 600; color: var(--muted);
+      padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border);
+      cursor: pointer; user-select: none; transition: color 0.15s;
+    }
+    .group-header:hover { color: var(--primary); }
+    .group-header.today-grp { color: var(--primary); }
+    .all-row {
+      display: flex; align-items: flex-start; gap: 10px; padding: 7px 10px;
+      border-radius: 8px; margin-bottom: 3px; transition: background 0.15s;
+    }
+    .all-row:hover { background: #fafafa; }
+    .all-row.sel-on { background: #fff5f5; }
+
+    @media (max-width: 700px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel-card { grid-column: 1; grid-row: 2; }
+      .all-card   { grid-column: 1; grid-row: 3; }
+      .cal-cell   { min-height: 60px; }
+      .meta-fields { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="app-title">할 일 달력</h1>
+  <div class="layout">
+    <div class="card calendar-card">
+      <div class="cal-nav">
+        <button class="nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+        <div class="cal-nav-center" id="calNavCenter"></div>
+        <button class="nav-btn" onclick="changeMonth(1)">&#8250;</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+    <div class="card panel-card" id="sidePanel"></div>
+    <div class="card all-card">
+      <div class="all-header">
+        <div class="all-header-left">전체 할 일 목록 <span class="badge" id="totalBadge">0</span></div>
+        <button class="sel-toggle-btn" id="selToggleBtn" onclick="toggleSelectMode()">선택</button>
+        <button class="sel-del-btn" id="selDelBtn" onclick="deleteSelected()" style="display:none" disabled>삭제 (0)</button>
+      </div>
+      <div id="allList"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ─────────────────────────────────────────
+    let data     = JSON.parse(localStorage.getItem('cal-todos')  || '{}');
+    let emojiMap = JSON.parse(localStorage.getItem('cal-emojis') || '{}');
+
+    // Migrate old single-emoji strings to arrays
+    Object.keys(emojiMap).forEach(k => {
+      if (typeof emojiMap[k] === 'string') emojiMap[k] = [emojiMap[k]];
+    });
+
+    let curYear, curMonth, sel = null;
+    let selectMode = false, selectedIds = new Set();
+    let emojiPickerOpen = false, emojiFilter = '전체';
+    let editingId = null;
+
+    const _today = new Date();
+    curYear = _today.getFullYear(); curMonth = _today.getMonth();
+
+    // ── Constants ─────────────────────────────────────
+    const DAY_KO   = ['일','월','화','수','목','금','토'];
+    const MONTH_KO = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    const CAT_PRESETS = ['경조사','약속','업무','운동','여행'];
+    const CAT_STYLES = {
+      '경조사': { color: '#db2777', bg: 'rgba(219,39,119,0.13)' },
+      '약속':   { color: '#ea580c', bg: 'rgba(234,88,12,0.13)'  },
+      '업무':   { color: '#2563eb', bg: 'rgba(37,99,235,0.13)'  },
+      '운동':   { color: '#16a34a', bg: 'rgba(22,163,74,0.13)'  },
+      '여행':   { color: '#7c3aed', bg: 'rgba(124,58,237,0.13)' },
+    };
+    const CAT_DEF = { color: '#64748b', bg: 'rgba(100,116,139,0.13)' };
+    const EMOJI_GROUPS = [
+      { name: '하트',    list: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🩷','💕','💖','💗','💓','💞','💝','💘','🥰','😍','😘','🤩'] },
+      { name: '별/기념', list: ['⭐','🌟','✨','💫','🌠','🎯','🏆','👑','🎉','🎊','🎈','🎀','🎁','🥳','🏅','🥇','🔥','💥','🎖️','🌈'] },
+      { name: '운동',    list: ['💪','🏃','🏋️','⚽','🏀','🎾','⚾','🏈','🎱','🏊','🚴','🧘','🤸','🏄','🎿','🏂','⛷️','🥊','🎽','🏇'] },
+      { name: '동물',    list: ['🐶','🐱','🐻','🐼','🐨','🦁','🐯','🦊','🐸','🐧','🐦','🦋','🐠','🐬','🐳','🦄','🐉','🐺','🦝','🐮'] },
+      { name: '사람',    list: ['👶','👧','👦','👩','👨','👴','👵','🤝','👫','🙋','🤗','😎','💃','🕺','🧑‍💻','👩‍🍳','👨‍🏫','🧑‍🎨','🫂','👨‍👩‍👧'] },
+      { name: '자연',    list: ['🌸','🌺','🌷','🌹','🌻','🌼','🍀','🍁','❄️','☀️','🌙','⛅','🌊','🏔️','🌿','🌴','🌵','🍎','🍕','🧁'] },
+    ];
+
+    // ── Utilities ─────────────────────────────────────
+    function todayKey() { return fmtKey(_today.getFullYear(), _today.getMonth(), _today.getDate()); }
+    function fmtKey(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+    function fmtLabel(key) {
+      const [y,m,d] = key.split('-').map(Number);
+      return `${y}년 ${m}월 ${d}일 (${DAY_KO[new Date(y,m-1,d).getDay()]})`;
+    }
+    function save()      { localStorage.setItem('cal-todos',  JSON.stringify(data)); }
+    function saveEmoji() { localStorage.setItem('cal-emojis', JSON.stringify(emojiMap)); }
+    function getCatStyle(c) { return CAT_STYLES[c] || CAT_DEF; }
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function sortedTodos(key) {
+      return [...(data[key] || [])].sort((a,b) => {
+        if (a.allDay && !b.allDay) return -1; if (!a.allDay && b.allDay) return 1;
+        return (a.timeStart||a.time||'').localeCompare(b.timeStart||b.time||'');
+      });
+    }
+
+    function timeStr(t) {
+      if (t.allDay) return '';
+      const s = t.timeStart || t.time || '';
+      return s ? (t.timeEnd ? `${s}–${t.timeEnd}` : s) : '';
+    }
+
+    function metaHtml(t) {
+      const parts = [];
+      const ts = timeStr(t); if (ts) parts.push(`<span class="meta-time">${ts}</span>`);
+      if (t.people)   parts.push(`<span class="meta-info">${esc(t.people)}</span>`);
+      if (t.location) parts.push(`<span class="meta-info">${esc(t.location)}</span>`);
+      if (!parts.length) return '';
+      return '<div class="todo-meta">' +
+        parts.map((p,i) => (i>0?'<span class="meta-dot">·</span>':'')+p).join('') + '</div>';
+    }
+
+    function catTagHtml(t) {
+      if (!t.category) return '';
+      const s = getCatStyle(t.category);
+      return `<span class="cat-tag" style="background:${s.bg};color:${s.color}">${esc(t.category)}</span>`;
+    }
+
+    function catPillsHtml(prefix) {
+      return CAT_PRESETS.map(c =>
+        `<button class="cat-pill" data-cat="${c}" onclick="selectCat(this,'${prefix}')">${c}</button>`
+      ).join('') + `<button class="cat-pill" data-cat="__custom__" onclick="selectCat(this,'${prefix}')">직접 입력</button>`;
+    }
+
+    // ── Calendar nav ──────────────────────────────────
+    function renderCalNav() {
+      const center = document.getElementById('calNavCenter');
+      const todayY = _today.getFullYear(), todayM = _today.getMonth();
+      center.innerHTML = `
+        <span class="year-label" id="yearLabel" onclick="startYearEdit()">${curYear}년</span>
+        <input id="yearInput" type="text" inputmode="numeric" maxlength="4" class="year-inp" value="${curYear}" style="display:none">
+        <span class="month-label" id="monthLabel" onclick="toggleMonthPicker()">${MONTH_KO[curMonth]}</span>
+        <div class="month-picker" id="monthPicker" style="display:none">
+          ${MONTH_KO.map((m,i) => `<button class="month-opt${i===curMonth?' cur-month':''}${i===todayM&&curYear===todayY&&i!==curMonth?' today-m':''}" onclick="selectMonth(${i})">${m}</button>`).join('')}
+        </div>
+        <button class="today-btn" onclick="goToToday()">오늘</button>`;
+      const yi = document.getElementById('yearInput');
+      yi.addEventListener('keydown', e => { if(e.key==='Enter') applyYearEdit(); if(e.key==='Escape') endYearEdit(); });
+      yi.addEventListener('blur', () => setTimeout(applyYearEdit, 150));
+    }
+
+    function startYearEdit() {
+      const p = document.getElementById('monthPicker'); if(p) p.style.display='none';
+      document.getElementById('yearLabel').style.display='none';
+      const inp = document.getElementById('yearInput'); inp.style.display=''; inp.focus(); inp.select();
+    }
+
+    function applyYearEdit() {
+      const inp = document.getElementById('yearInput');
+      if(!inp || inp.style.display==='none') return;
+      const y = parseInt(inp.value);
+      if(!isNaN(y) && y>=1900 && y<=2100) curYear=y;
+      renderCalendar();
+    }
+
+    function endYearEdit() {
+      const l=document.getElementById('yearLabel'), i=document.getElementById('yearInput');
+      if(l) l.style.display=''; if(i) i.style.display='none';
+    }
+
+    function toggleMonthPicker() {
+      endYearEdit();
+      const p = document.getElementById('monthPicker'); if(!p) return;
+      p.style.display = p.style.display==='none' ? '' : 'none';
+    }
+
+    function selectMonth(m) { curMonth=m; renderCalendar(); }
+
+    function goToToday() {
+      curYear=_today.getFullYear(); curMonth=_today.getMonth(); sel=todayKey();
+      renderCalendar(); renderPanel();
+    }
+
+    // ── Calendar ─────────────────────────────────────
+    function changeMonth(d) {
+      curMonth += d;
+      if (curMonth>11){curMonth=0;curYear++;} if (curMonth<0){curMonth=11;curYear--;}
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      renderCalNav();
+      const grid = document.getElementById('calGrid'); grid.innerHTML = '';
+      DAY_KO.forEach((n,i) => {
+        const el=document.createElement('div'); el.className='day-name'+(i===0?' sun':i===6?' sat':''); el.textContent=n; grid.appendChild(el);
+      });
+      const fd=new Date(curYear,curMonth,1).getDay(), dim=new Date(curYear,curMonth+1,0).getDate(), dip=new Date(curYear,curMonth,0).getDate();
+      for(let i=0;i<fd;i++) grid.appendChild(makeCell(curYear,curMonth-1,dip-fd+1+i,true));
+      for(let d=1;d<=dim;d++) grid.appendChild(makeCell(curYear,curMonth,d,false));
+      const tail=(fd+dim)%7; if(tail>0) for(let d=1;d<=7-tail;d++) grid.appendChild(makeCell(curYear,curMonth+1,d,true));
+    }
+
+    function makeCell(y, m, d, other) {
+      let ny=y,nm=m; if(nm<0){nm=11;ny--;} if(nm>11){nm=0;ny++;}
+      const key=fmtKey(ny,nm,d);
+      const cell=document.createElement('div'); cell.className='cal-cell'+(other?' other':'');
+      if(!other){
+        const dow=new Date(ny,nm,d).getDay();
+        if(dow===0)cell.classList.add('sun'); if(dow===6)cell.classList.add('sat');
+        if(key===todayKey())cell.classList.add('is-today'); if(key===sel)cell.classList.add('selected');
+        cell.addEventListener('click',()=>selectDate(key));
+      }
+      const head=document.createElement('div'); head.className='cell-head';
+      const dn=document.createElement('div'); dn.className='dn'; dn.textContent=d; head.appendChild(dn);
+      if(!other){
+        const emojis=emojiMap[key]||[];
+        emojis.slice(0,3).forEach(e=>{ const em=document.createElement('span'); em.className='cell-emoji'; em.textContent=e; head.appendChild(em); });
+        if(emojis.length>3){ const more=document.createElement('span'); more.className='cell-emoji-more'; more.textContent=`+${emojis.length-3}`; head.appendChild(more); }
+      }
+      cell.appendChild(head);
+      if(!other){
+        const todos=sortedTodos(key);
+        if(todos.length>0){
+          const wrap=document.createElement('div'); wrap.className='chips';
+          todos.slice(0,2).forEach(t=>{
+            const c=document.createElement('div'); c.className='chip'+(t.done?' done':'');
+            if(t.category&&!t.done){const s=getCatStyle(t.category);c.style.background=s.bg;c.style.color=s.color;}
+            const ts2=timeStr(t); c.textContent=(ts2?ts2+' ':'')+t.text; wrap.appendChild(c);
+          });
+          if(todos.length>2){const more=document.createElement('div');more.className='more-label';more.textContent=`+${todos.length-2}개 더`;wrap.appendChild(more);}
+          cell.appendChild(wrap);
+        }
+      }
+      return cell;
+    }
+
+    function selectDate(key) {
+      sel=key; emojiPickerOpen=false; editingId=null; renderCalendar(); renderPanel();
+    }
+
+    // ── Panel ─────────────────────────────────────────
+    function renderPanel() {
+      const panel=document.getElementById('sidePanel');
+      if(!sel){
+        panel.innerHTML=`<div class="panel-placeholder"><div class="ph-circle">31</div>달력에서 날짜를 선택하면<br>할 일을 추가할 수 있어요</div>`;
+        return;
+      }
+      const todos=sortedTodos(sel), isToday=sel===todayKey();
+      const emojis=emojiMap[sel]||[];
+
+      const listHtml = todos.length===0
+        ? `<div class="list-empty">등록된 할 일이 없어요</div>`
+        : todos.map(t => t.id===editingId ? renderEditFormHtml(t) : renderTodoItemHtml(t)).join('');
+
+      const tabsHtml = `<button class="etab${emojiFilter==='전체'?' active':''}" data-group="전체" onclick="setEmojiFilter('전체')">전체</button>` +
+        EMOJI_GROUPS.map(g=>`<button class="etab${emojiFilter===g.name?' active':''}" data-group="${g.name}" onclick="setEmojiFilter('${g.name}')">${g.name}</button>`).join('');
+
+      const selEmojiHtml = emojis.map(e =>
+        `<button class="sel-emoji-chip" data-e="${e}" onclick="removeEmojiChip(this)">${e}<span class="chip-x">×</span></button>`
+      ).join('');
+
+      panel.innerHTML = `
+        <div class="panel-date-label">
+          <div class="pday">${fmtLabel(sel)}${isToday?'<span class="today-tag">오늘</span>':''}</div>
+        </div>
+        <div class="emoji-section">
+          <div class="emoji-sec-head" onclick="toggleEmojiPicker()">
+            <span class="emoji-sec-label">날짜 이모티콘</span>
+            <div class="emoji-sec-right">
+              <span id="curEmojiDisplay" class="cur-emoji">${emojis.slice(0,4).join('')}</span>
+              <span class="emoji-arr" id="emojiArr">${emojiPickerOpen?'▲':'▽'}</span>
+            </div>
+          </div>
+          <div id="emojiPickerWrap" class="emoji-picker-wrap" style="${emojiPickerOpen?'':'display:none'}">
+            <div class="sel-emoji-row" id="selEmojiRow">${selEmojiHtml}</div>
+            <div class="emoji-filter-row">${tabsHtml}</div>
+            <div class="emoji-grid" id="emojiGrid"></div>
+            <button id="clearEmojiBtn" class="clear-emoji-btn" onclick="clearEmoji()" style="${emojis.length?'':'display:none'}">이모티콘 전체 삭제</button>
+          </div>
+        </div>
+        <div class="add-form">
+          <div class="add-row">
+            <input id="pInput" type="text" placeholder="새 할 일 입력" maxlength="100">
+            <button class="add-btn" onclick="addTodo()">추가</button>
+          </div>
+          <div class="time-row">
+            <div class="seg-grp">
+              <button class="seg-btn active" id="btnAllDay" onclick="setTimeMode('allday','add')">종일</button>
+              <button class="seg-btn"        id="btnTime"   onclick="setTimeMode('time','add')">시간 지정</button>
+            </div>
+            <div class="time-range" id="timeRange" style="display:none">
+              <input type="time" id="timeStart" class="time-inp" value="09:00">
+              <span class="time-sep">–</span>
+              <input type="time" id="timeEnd"   class="time-inp" value="10:00">
+            </div>
+          </div>
+          <div class="cat-pills" id="catPills">${catPillsHtml('add')}</div>
+          <input type="text" id="customCat" class="custom-cat-inp" placeholder="카테고리 직접 입력" maxlength="20" style="display:none">
+          <div class="meta-fields">
+            <input type="text" id="peopleInput" class="meta-field" placeholder="함께 하는 사람" maxlength="50">
+            <input type="text" id="locInput"    class="meta-field" placeholder="장소" maxlength="50">
+          </div>
+        </div>
+        <div class="todo-list">${listHtml}</div>`;
+
+      if(emojiPickerOpen) renderEmojiGrid();
+
+      if(editingId) {
+        const t=todos.find(x=>x.id===editingId);
+        if(t) initEditForm(t);
+        const ei=document.getElementById('edit-text');
+        if(ei){ ei.focus(); ei.select();
+          ei.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.isComposing) saveEdit(editingId,sel); if(e.key==='Escape') cancelEdit(); });
+        }
+      } else {
+        const inp=document.getElementById('pInput');
+        if(inp){ inp.focus(); inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.isComposing) addTodo(); }); }
+      }
+    }
+
+    function renderTodoItemHtml(t) {
+      return `
+        <div class="todo-item${t.done?' done':''}">
+          <div class="cbw"><input type="checkbox" id="pcb-${t.id}" ${t.done?'checked':''} onchange="toggleTodo('${sel}',${t.id})"><label for="pcb-${t.id}"></label></div>
+          <div class="item-body">
+            <div class="item-head"><div class="item-text">${esc(t.text)}</div>${catTagHtml(t)}</div>
+            ${metaHtml(t)}
+          </div>
+          <button class="editbtn" onclick="startEdit(${t.id})" title="수정">&#9998;</button>
+          <button class="delbtn"  onclick="deleteTodo('${sel}',${t.id})" title="삭제">&#10005;</button>
+        </div>`;
+    }
+
+    function renderEditFormHtml(t) {
+      return `
+        <div class="edit-form">
+          <input id="edit-text" type="text" class="edit-text-inp" value="${esc(t.text)}" maxlength="100">
+          <div class="time-row">
+            <div class="seg-grp">
+              <button class="seg-btn ${t.allDay?'active':''}"  id="edit-btnAllDay" onclick="setTimeMode('allday','edit')">종일</button>
+              <button class="seg-btn ${!t.allDay?'active':''}" id="edit-btnTime"   onclick="setTimeMode('time','edit')">시간 지정</button>
+            </div>
+            <div class="time-range" id="edit-timeRange" style="${t.allDay?'display:none':''}">
+              <input type="time" id="edit-timeStart" class="time-inp" value="${t.timeStart||t.time||'09:00'}">
+              <span class="time-sep">–</span>
+              <input type="time" id="edit-timeEnd"   class="time-inp" value="${t.timeEnd||''}">
+            </div>
+          </div>
+          <div class="cat-pills" id="editCatPills">${catPillsHtml('edit')}</div>
+          <input type="text" id="edit-customCat" class="custom-cat-inp" placeholder="카테고리 직접 입력" maxlength="20"
+            value="${t.category && !CAT_PRESETS.includes(t.category) ? esc(t.category) : ''}" style="display:none">
+          <div class="meta-fields">
+            <input type="text" id="edit-people" class="meta-field" placeholder="함께 하는 사람" maxlength="50" value="${esc(t.people||'')}">
+            <input type="text" id="edit-loc"    class="meta-field" placeholder="장소"          maxlength="50" value="${esc(t.location||'')}">
+          </div>
+          <div class="edit-actions">
+            <button class="edit-save-btn"   onclick="saveEdit(${t.id},'${sel}')">저장</button>
+            <button class="edit-cancel-btn" onclick="cancelEdit()">취소</button>
+          </div>
+        </div>`;
+    }
+
+    function initEditForm(t) {
+      if (!t.category) return;
+      const isPreset = CAT_PRESETS.includes(t.category);
+      const catKey = isPreset ? t.category : '__custom__';
+      const pill = document.querySelector(`#editCatPills .cat-pill[data-cat="${catKey}"]`);
+      if (!pill) return;
+      const s = isPreset ? getCatStyle(t.category) : CAT_DEF;
+      pill.classList.add('active');
+      pill.style.background = s.bg; pill.style.color = s.color; pill.style.borderColor = s.color;
+      if (!isPreset) {
+        const ci = document.getElementById('edit-customCat');
+        if (ci) ci.style.display = '';
+      }
+    }
+
+    // ── Emoji ─────────────────────────────────────────
+    function toggleEmojiPicker() {
+      emojiPickerOpen = !emojiPickerOpen;
+      const wrap=document.getElementById('emojiPickerWrap'), arr=document.getElementById('emojiArr');
+      if(!wrap) return;
+      wrap.style.display = emojiPickerOpen ? '' : 'none';
+      if(arr) arr.textContent = emojiPickerOpen ? '▲' : '▽';
+      if(emojiPickerOpen) renderEmojiGrid();
+    }
+
+    function setEmojiFilter(name) {
+      emojiFilter = name;
+      document.querySelectorAll('.etab').forEach(t => t.classList.toggle('active', t.dataset.group===name));
+      renderEmojiGrid();
+    }
+
+    function renderEmojiGrid() {
+      const grid=document.getElementById('emojiGrid'); if(!grid) return;
+      const list = emojiFilter==='전체' ? EMOJI_GROUPS.flatMap(g=>g.list) : (EMOJI_GROUPS.find(g=>g.name===emojiFilter)?.list||[]);
+      const selected = new Set(sel ? (emojiMap[sel]||[]) : []);
+      grid.innerHTML = list.map(e =>
+        `<button class="emo-btn${selected.has(e)?' sel':''}" data-e="${e}" onclick="pickEmoji(this)">${e}</button>`
+      ).join('');
+    }
+
+    function pickEmoji(btn) {
+      if(!sel) return;
+      const emoji = btn.getAttribute('data-e');
+      if(!emojiMap[sel]) emojiMap[sel]=[];
+      const idx = emojiMap[sel].indexOf(emoji);
+      if(idx>=0) {
+        emojiMap[sel].splice(idx,1);
+        if(!emojiMap[sel].length) delete emojiMap[sel];
+        btn.classList.remove('sel');
+      } else {
+        emojiMap[sel].push(emoji);
+        btn.classList.add('sel');
+      }
+      saveEmoji();
+      updateEmojiDisplay();
+      renderSelectedEmojis();
+      renderCalendar();
+    }
+
+    function removeEmojiChip(btn) {
+      removeEmoji(btn.getAttribute('data-e'));
+    }
+
+    function removeEmoji(emoji) {
+      if(!sel||!emojiMap[sel]) return;
+      emojiMap[sel] = emojiMap[sel].filter(e=>e!==emoji);
+      if(!emojiMap[sel].length) delete emojiMap[sel];
+      saveEmoji();
+      updateEmojiDisplay();
+      renderSelectedEmojis();
+      document.querySelectorAll('.emo-btn').forEach(b=>{ if(b.getAttribute('data-e')===emoji) b.classList.remove('sel'); });
+      renderCalendar();
+    }
+
+    function clearEmoji() {
+      if(!sel) return;
+      delete emojiMap[sel]; saveEmoji();
+      updateEmojiDisplay(); renderSelectedEmojis();
+      document.querySelectorAll('.emo-btn').forEach(b=>b.classList.remove('sel'));
+      renderCalendar();
+    }
+
+    function updateEmojiDisplay() {
+      const emojis=emojiMap[sel]||[];
+      const cur=document.getElementById('curEmojiDisplay'); if(cur) cur.textContent=emojis.slice(0,4).join('');
+      const cb=document.getElementById('clearEmojiBtn');   if(cb)  cb.style.display=emojis.length?'':'none';
+    }
+
+    function renderSelectedEmojis() {
+      const row=document.getElementById('selEmojiRow'); if(!row) return;
+      const emojis=emojiMap[sel]||[];
+      row.innerHTML=emojis.map(e=>
+        `<button class="sel-emoji-chip" data-e="${e}" onclick="removeEmojiChip(this)">${e}<span class="chip-x">×</span></button>`
+      ).join('');
+    }
+
+    // ── Form controls (shared by add + edit) ──────────
+    function setTimeMode(mode, ctx) {
+      const pfx = ctx==='edit' ? 'edit-' : '';
+      const btnA=document.getElementById(`${pfx}btnAllDay`), btnT=document.getElementById(`${pfx}btnTime`), range=document.getElementById(`${pfx}timeRange`);
+      if(!btnA) return;
+      if(mode==='allday'){ btnA.classList.add('active'); btnT.classList.remove('active'); range.style.display='none'; }
+      else { btnT.classList.add('active'); btnA.classList.remove('active'); range.style.display=''; document.getElementById(`${pfx}timeStart`)?.focus(); }
+    }
+
+    function selectCat(btn, ctx) {
+      const pfx = ctx==='edit' ? 'edit-' : '';
+      const poolId = ctx==='edit' ? 'editCatPills' : 'catPills';
+      const ciId   = ctx==='edit' ? 'edit-customCat' : 'customCat';
+      const wasActive = btn.classList.contains('active');
+      document.querySelectorAll(`#${poolId} .cat-pill`).forEach(b=>{ b.classList.remove('active'); b.style.background=''; b.style.color=''; b.style.borderColor=''; });
+      const ci=document.getElementById(ciId);
+      if(!wasActive){
+        btn.classList.add('active');
+        const cat=btn.dataset.cat;
+        if(cat!=='__custom__'){ const s=getCatStyle(cat); btn.style.background=s.bg; btn.style.color=s.color; btn.style.borderColor=s.color; if(ci) ci.style.display='none'; }
+        else { btn.style.background=CAT_DEF.bg; btn.style.color=CAT_DEF.color; btn.style.borderColor=CAT_DEF.color; if(ci){ci.style.display='';ci.focus();} }
+      } else { if(ci) ci.style.display='none'; }
+    }
+
+    function readFormValues(ctx) {
+      const pfx = ctx==='edit' ? 'edit-' : '';
+      const poolId = ctx==='edit' ? 'editCatPills' : 'catPills';
+      const allDay = !document.getElementById(`${pfx}btnTime`)?.classList.contains('active');
+      const timeStart = allDay ? null : (document.getElementById(`${pfx}timeStart`)?.value||'09:00');
+      const timeEnd   = allDay ? null : (document.getElementById(`${pfx}timeEnd`)?.value||null)||null;
+      const people    = (document.getElementById(`${pfx}people`+(ctx==='add'?'Input':''))?.value||'').trim()||null;
+      const location  = (document.getElementById(ctx==='edit'?'edit-loc':'locInput')?.value||'').trim()||null;
+      let category = null;
+      const ap = document.querySelector(`#${poolId} .cat-pill.active`);
+      if(ap){ const cat=ap.dataset.cat; category=cat==='__custom__'?(document.getElementById(ctx==='edit'?'edit-customCat':'customCat')?.value||'').trim()||null:cat; }
+      return { allDay, timeStart, timeEnd, people, location, category };
+    }
+
+    // ── CRUD ─────────────────────────────────────────
+    function addTodo() {
+      const inp=document.getElementById('pInput'), text=(inp?.value||'').trim();
+      if(!text||!sel) return;
+      const v=readFormValues('add');
+      (data[sel]=data[sel]||[]).push({ id:Date.now(), text, done:false, ...v });
+      save(); refresh();
+    }
+
+    function startEdit(id) { editingId=id; renderPanel(); }
+    function cancelEdit()   { editingId=null; renderPanel(); }
+
+    function saveEdit(id, key) {
+      const t=data[key]?.find(x=>x.id===id); if(!t) return;
+      const text=(document.getElementById('edit-text')?.value||'').trim(); if(!text) return;
+      const v=readFormValues('edit');
+      Object.assign(t, { text, ...v });
+      editingId=null; save(); refresh();
+    }
+
+    function toggleTodo(key, id) {
+      const t=data[key]?.find(x=>x.id===id); if(t){ t.done=!t.done; save(); refresh(); }
+    }
+
+    function deleteTodo(key, id) {
+      if(!data[key]) return;
+      data[key]=data[key].filter(x=>x.id!==id);
+      if(!data[key].length) delete data[key];
+      selectedIds.delete(id);
+      if(editingId===id) editingId=null;
+      save(); refresh();
+    }
+
+    function refresh() { renderCalendar(); renderPanel(); renderAllTodos(); }
+
+    // ── All Todos: select mode ─────────────────────────
+    function toggleSelectMode() {
+      selectMode=!selectMode; if(!selectMode) selectedIds.clear();
+      const btn=document.getElementById('selToggleBtn'), del=document.getElementById('selDelBtn');
+      btn.textContent=selectMode?'취소':'선택'; btn.classList.toggle('on',selectMode);
+      del.style.display=selectMode?'':'none'; if(selectMode){del.textContent='삭제 (0)';del.disabled=true;}
+      renderAllTodos();
+    }
+
+    function toggleSelectItem(id) {
+      if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+      const del=document.getElementById('selDelBtn');
+      if(del){del.textContent=`삭제 (${selectedIds.size})`;del.disabled=!selectedIds.size;}
+      const row=document.getElementById(`arow-${id}`); if(row) row.classList.toggle('sel-on',selectedIds.has(id));
+    }
+
+    function deleteSelected() {
+      if(!selectedIds.size) return;
+      Object.keys(data).forEach(k=>{ data[k]=(data[k]||[]).filter(t=>!selectedIds.has(t.id)); if(!data[k].length) delete data[k]; });
+      selectedIds.clear(); selectMode=false;
+      const btn=document.getElementById('selToggleBtn'), del=document.getElementById('selDelBtn');
+      if(btn){btn.textContent='선택';btn.classList.remove('on');} if(del) del.style.display='none';
+      save(); refresh();
+    }
+
+    // ── All Todos ─────────────────────────────────────
+    function renderAllTodos() {
+      const list=document.getElementById('allList'), badge=document.getElementById('totalBadge');
+      const keys=Object.keys(data).filter(k=>data[k]?.length).sort();
+      badge.textContent=keys.reduce((s,k)=>s+data[k].length,0);
+      if(!keys.length){ list.innerHTML=`<div class="all-empty">아직 등록된 할 일이 없어요</div>`; return; }
+      list.innerHTML=keys.map(key=>{
+        const isToday=key===todayKey();
+        const rows=sortedTodos(key).map(t=>{
+          if(selectMode) return `
+            <div class="all-row${t.done?' done':''} ${selectedIds.has(t.id)?' sel-on':''}" id="arow-${t.id}">
+              <div class="scbw"><input type="checkbox" id="scb-${t.id}" ${selectedIds.has(t.id)?'checked':''} onchange="toggleSelectItem(${t.id})"><label for="scb-${t.id}"></label></div>
+              <div class="item-body"><div class="item-head"><div class="item-text">${esc(t.text)}</div>${catTagHtml(t)}</div>${metaHtml(t)}</div>
+            </div>`;
+          return `
+            <div class="all-row${t.done?' done':''}" id="arow-${t.id}">
+              <div class="cbw"><input type="checkbox" id="acb-${t.id}" ${t.done?'checked':''} onchange="toggleTodo('${key}',${t.id})"><label for="acb-${t.id}"></label></div>
+              <div class="item-body"><div class="item-head"><div class="item-text">${esc(t.text)}</div>${catTagHtml(t)}</div>${metaHtml(t)}</div>
+              <button class="delbtn" onclick="deleteTodo('${key}',${t.id})">&#10005;</button>
+            </div>`;
+        }).join('');
+        return `<div class="date-group"><div class="group-header${isToday?' today-grp':''}" onclick="jumpToDate('${key}')">${fmtLabel(key)}${isToday?' &middot; 오늘':''}</div>${rows}</div>`;
+      }).join('');
+    }
+
+    function jumpToDate(key) {
+      const [y,m]=key.split('-').map(Number); curYear=y; curMonth=m-1; sel=key;
+      emojiPickerOpen=false; editingId=null; refresh(); window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    // ── Init ──────────────────────────────────────────
+    document.addEventListener('click', e => {
+      const p=document.getElementById('monthPicker');
+      const ml=document.getElementById('monthLabel');
+      if(p && p.style.display!=='none' && !p.contains(e.target) && e.target!==ml) p.style.display='none';
+    });
+    renderCalendar(); renderPanel(); renderAllTodos();
+  </script>
+</body>
+</html>
